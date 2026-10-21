@@ -1,0 +1,20 @@
+{
+  "name": "focus-pomodoro",
+  "version": "1.0.0",
+  "description": "Minimal AMOLED pomodoro timer",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win"
+  },
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^25.0.0"
+  },
+  "build": {
+    "appId": "com.focus.pomodoro",
+    "productName": "Focus",
+    "files": ["main.js", "preload.js", "index.html"],
+    "win": { "target": "portable", "artifactName": "Focus.exe" }
+  }
+}

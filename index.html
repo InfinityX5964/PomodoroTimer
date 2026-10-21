@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Focus</title>
+<style>
+:root{--bg:#000;--fg:#f4f4f5;--mute:#6f6f76;--line:#1c1c1f;--accent:#ff6b5e}
+body[data-mode=short]{--accent:#4ade80}
+body[data-mode=long]{--accent:#60a5fa}
+*{box-sizing:border-box;margin:0}
+html,body{height:100%}
+body{background:var(--bg);color:var(--fg);font-family:"Segoe UI Variable Display","SF Pro Display",ui-sans-serif,system-ui,sans-serif;display:flex;justify-content:center;align-items:center;-webkit-font-smoothing:antialiased}
+button,input{font:inherit;color:inherit}
+button{background:none;border:0;cursor:pointer}
+button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:8px}
+#app{width:min(380px,100%);padding:28px 24px;display:flex;flex-direction:column;align-items:center;gap:22px}
+.tabs{display:flex;gap:4px;padding:4px;border:1px solid var(--line);border-radius:999px}
+.tabs button{padding:7px 16px;border-radius:999px;color:var(--mute);font-size:14px;transition:.2s}
+.tabs button.on{background:var(--fg);color:#000}
+.ring{position:relative;width:100%;max-width:280px;aspect-ratio:1}
+.ring svg{width:100%;height:100%;transform:rotate(-90deg)}
+.ring circle{fill:none;stroke-width:4}
+.ring .track{stroke:var(--line)}
+.ring .bar{stroke:var(--accent);stroke-linecap:round;stroke-dasharray:565.49;transition:stroke-dashoffset .4s linear,stroke .3s}
+.center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px}
+#time{font-size:clamp(48px,19vw,68px);font-weight:200;letter-spacing:-.02em;font-variant-numeric:tabular-nums;line-height:1}
+#label{color:var(--mute);font-size:14px}
+#task{width:100%;background:none;border:0;border-bottom:1px solid var(--line);padding:8px 2px;text-align:center;font-size:15px}
+#task::placeholder{color:#44444a}
+#task:focus{border-color:var(--accent);outline:0}
+.ctl{display:flex;align-items:center;gap:20px}
+.ctl button{width:48px;height:48px;border-radius:50%;color:var(--mute);display:grid;place-items:center;transition:.2s}
+.ctl button:hover{color:var(--fg)}
+.ctl #go{width:72px;height:72px;background:var(--accent);color:#000}
+.ctl #go:hover{transform:scale(1.04);color:#000}
+svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+#go svg{width:28px;height:28px;fill:currentColor;stroke:none}
+.dots{display:flex;gap:8px}
+.dots i{width:8px;height:8px;border-radius:50%;border:1px solid #3a3a40}
+.dots i.f{background:var(--accent);border-color:var(--accent)}
+.foot{width:100%;display:flex;justify-content:space-between;align-items:center;color:var(--mute);font-size:13px}
+.foot button{color:var(--mute);display:flex;gap:6px;align-items:center;padding:6px 8px;border-radius:8px}
+.foot button:hover{color:var(--fg)}
+#settings{display:none;width:100%;flex-direction:column;gap:14px}
+.row{display:flex;justify-content:space-between;align-items:center;font-size:15px}
+.row input[type=number]{width:64px;background:#0b0b0c;border:1px solid var(--line);border-radius:8px;padding:7px 8px;text-align:center}
+.sw{appearance:none;width:42px;height:24px;border-radius:99px;background:var(--line);position:relative;cursor:pointer;transition:.2s}
+.sw::after{content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:var(--fg);transition:.2s}
+.sw:checked{background:var(--accent)}
+.sw:checked::after{left:21px;background:#000}
+body.set #settings{display:flex}
+body.set .main{display:none}
+.main{display:contents}
+#toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:#141416;border:1px solid var(--line);padding:8px 14px;border-radius:10px;font-size:13px;opacity:0;pointer-events:none;transition:.3s}
+#toast.show{opacity:1}
+#drag{display:none}
+body.electron{padding-top:32px}
+body.electron #drag{display:block;position:fixed;top:0;left:0;right:0;height:32px;-webkit-app-region:drag}
+/* mini mode (floating window) */
+body.mini #app{padding:10px;gap:10px}
+body.mini .tabs,body.mini #task,body.mini .foot,body.mini .dots{display:none}
+body.mini .ring{max-width:210px}
+body.mini #time{font-size:44px}
+body.mini .ctl{gap:12px}
+body.mini .ctl #go{width:52px;height:52px}
+body.mini .ctl #go svg{width:22px;height:22px}
+body.mini .ctl button{width:38px;height:38px}
+body.mini.electron .foot{display:flex;justify-content:center}
+body.mini.electron #stats,body.mini.electron #gear{display:none}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body data-mode="focus">
+<div id="drag"></div>
+<div id="app">
+  <div class="main" id="main">
+    <div class="tabs" id="tabs">
+      <button data-m="focus" class="on">Focus</button>
+      <button data-m="short">Short break</button>
+      <button data-m="long">Long break</button>
+    </div>
+    <div class="ring">
+      <svg viewBox="0 0 200 200"><circle class="track" cx="100" cy="100" r="90"/><circle class="bar" id="bar" cx="100" cy="100" r="90"/></svg>
+      <div class="center"><div id="time">25:00</div><div id="label">Ready</div></div>
+    </div>
+    <input id="task" placeholder="What are you working on?" maxlength="60" aria-label="Current task">
+    <div class="ctl">
+      <button id="reset" title="Reset (R)" aria-label="Reset"><svg class="i" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg></button>
+      <button id="go" title="Start / pause (Space)" aria-label="Start"></button>
+      <button id="skip" title="Skip (S)" aria-label="Skip"><svg class="i" viewBox="0 0 24 24"><path d="M5 5l10 7-10 7z"/><path d="M19 5v14"/></svg></button>
+    </div>
+    <div class="dots" id="dots"></div>
+    <div class="foot">
+      <span id="stats">Today: 0 sessions</span>
+      <span>
+        <button id="mini" title="Float on top (M)"><svg class="i" viewBox="0 0 24 24" style="width:16px;height:16px"><rect x="3" y="4" width="18" height="14" rx="2"/><rect x="12" y="11" width="7" height="5" rx="1"/></svg>Float</button>
+        <button id="gear" title="Settings"><svg class="i" viewBox="0 0 24 24" style="width:16px;height:16px"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>Settings</button>
+      </span>
+    </div>
+  </div>
+  <div id="settings">
+    <div class="row"><span>Focus (min)</span><input type="number" id="s-focus" min="1" max="120"></div>
+    <div class="row"><span>Short break (min)</span><input type="number" id="s-short" min="1" max="60"></div>
+    <div class="row"><span>Long break (min)</span><input type="number" id="s-long" min="1" max="90"></div>
+    <div class="row"><span>Long break after</span><input type="number" id="s-every" min="2" max="8"></div>
+    <div class="row"><span>Start next session automatically</span><input type="checkbox" class="sw" id="s-auto"></div>
+    <div class="row"><span>Chime</span><input type="checkbox" class="sw" id="s-sound"></div>
+    <div class="row"><span>Notifications</span><input type="checkbox" class="sw" id="s-notify"></div>
+    <div class="foot" style="justify-content:flex-end"><button id="back">Done</button></div>
+  </div>
+</div>
+<div id="toast"></div>
+<script>
+(()=>{
+const $=id=>document.getElementById(id);
+if(window.electronAPI)document.body.classList.add('electron');
+const C=2*Math.PI*90;
+const DEF={focus:25,short:5,long:15,every:4,auto:false,sound:true,notify:false};
+const get=(k,d)=>{try{return JSON.parse(localStorage.getItem(k))??d}catch(e){return d}};
+const put=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}};
+let cfg={...DEF,...get('pomo.cfg',{})};
+const today=()=>new Date().toDateString();
+let stats=get('pomo.stats',{d:today(),n:0,m:0});
+if(stats.d!==today())stats={d:today(),n:0,m:0};
+let mode='focus',left=cfg.focus*60,running=false,endAt=0,done=0;
+
+const PLAY='<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>';
+const PAUSE='<svg viewBox="0 0 24 24"><path d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z"/></svg>';
+const NAMES={focus:'Focus',short:'Short break',long:'Long break'};
+const total=()=>cfg[mode]*60;
+const fmt=s=>String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0');
+
+function render(){
+  document.body.dataset.mode=mode;
+  $('time').textContent=fmt(left);
+  $('bar').style.strokeDasharray=C;
+  $('bar').style.strokeDashoffset=C*(1-left/total());
+  $('label').textContent=running?NAMES[mode]:(left===total()?'Ready':'Paused');
+  $('go').innerHTML=running?PAUSE:PLAY;
+  $('go').setAttribute('aria-label',running?'Pause':'Start');
+  document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('on',b.dataset.m===mode));
+  const filled=mode==='long'?cfg.every:done%cfg.every;
+  $('dots').innerHTML=Array.from({length:cfg.every},(_,i)=>'<i class="'+(i<filled?'f':'')+'"></i>').join('');
+  const h=Math.floor(stats.m/60),m=stats.m%60;
+  $('stats').textContent='Today: '+stats.n+(stats.n===1?' session':' sessions')+(stats.m?' · '+(h?h+'h ':'')+m+'m':'');
+  document.title=(running?fmt(left)+' · ':'')+NAMES[mode];
+}
+function setMode(m){mode=m;running=false;left=total();render()}
+function start(){
+  if(running)return;
+  if(cfg.notify&&'Notification'in window&&Notification.permission==='default')Notification.requestPermission();
+  running=true;endAt=Date.now()+left*1000;render();
+}
+function pause(){if(!running)return;running=false;render()}
+const toggle=()=>running?pause():start();
+function reset(){running=false;left=total();render()}
+function next(){
+  if(mode==='focus'){done++;setMode(done%cfg.every===0?'long':'short')}
+  else setMode('focus');
+}
+function complete(){
+  if(mode==='focus'){stats.n++;stats.m+=cfg.focus;put('pomo.stats',stats)}
+  chime();
+  const was=mode;next();
+  notify(was==='focus'?'Focus session done. Time for a break.':'Break over. Ready to focus?');
+  if(cfg.auto)start();
+}
+function tick(){
+  if(!running)return;
+  const r=Math.max(0,Math.ceil((endAt-Date.now())/1000));
+  if(r!==left){left=r;render()}
+  if(r<=0)complete();
+}
+setInterval(tick,250);
+
+let ac;
+function chime(){
+  if(!cfg.sound)return;
+  try{
+    ac=ac||new (window.AudioContext||window.webkitAudioContext)();
+    [660,880,1100].forEach((f,i)=>{
+      const o=ac.createOscillator(),g=ac.createGain(),t=ac.currentTime+i*.18;
+      o.type='sine';o.frequency.value=f;
+      g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(.18,t+.02);g.gain.exponentialRampToValueAtTime(.001,t+.6);
+      o.connect(g).connect(ac.destination);o.start(t);o.stop(t+.65);
+    });
+  }catch(e){}
+}
+function notify(msg){
+  if(cfg.notify&&'Notification'in window&&Notification.permission==='granted'){try{new Notification('Focus',{body:msg,silent:true})}catch(e){}}
+  toast(msg);
+}
+let tt;
+function toast(m){const t=$('toast');t.textContent=m;t.classList.add('show');clearTimeout(tt);tt=setTimeout(()=>t.classList.remove('show'),3500)}
+
+// controls
+$('go').onclick=toggle;$('reset').onclick=reset;$('skip').onclick=()=>{running=false;next()};
+document.querySelectorAll('#tabs button').forEach(b=>b.onclick=()=>setMode(b.dataset.m));
+$('task').value=get('pomo.task','');
+$('task').oninput=e=>put('pomo.task',e.target.value);
+
+// settings
+const keys=['focus','short','long','every'];
+function openSet(){keys.forEach(k=>$('s-'+k).value=cfg[k]);['auto','sound','notify'].forEach(k=>$('s-'+k).checked=cfg[k]);document.body.classList.add('set')}
+function closeSet(){
+  keys.forEach(k=>{const v=parseInt($('s-'+k).value,10);if(v>0)cfg[k]=v});
+  ['auto','sound','notify'].forEach(k=>cfg[k]=$('s-'+k).checked);
+  if(cfg.notify&&'Notification'in window&&Notification.permission==='default')Notification.requestPermission();
+  put('pomo.cfg',cfg);document.body.classList.remove('set');
+  if(!running)left=total();render();
+}
+$('gear').onclick=openSet;$('back').onclick=closeSet;
+
+// keyboard
+function keys_(e){
+  if(e.target.tagName==='INPUT')return;
+  if(e.code==='Space'){e.preventDefault();toggle()}
+  else if(e.key==='r'||e.key==='R')reset();
+  else if(e.key==='s'||e.key==='S'){running=false;next()}
+  else if(e.key==='m'||e.key==='M')floatToggle();
+}
+document.addEventListener('keydown',keys_);
+
+// always-on-top floating window (Document Picture-in-Picture, Chrome/Edge)
+let pip=null;
+async function floatToggle(){
+  if(window.electronAPI){const m=await window.electronAPI.toggleMini();document.body.classList.toggle('mini',m);return}
+  if(pip){pip.close();return}
+  if(!('documentPictureInPicture'in window)){toast('Floating needs Chrome or Edge 116+');return}
+  try{
+    pip=await documentPictureInPicture.requestWindow({width:260,height:300});
+    [...document.querySelectorAll('style')].forEach(s=>pip.document.head.appendChild(s.cloneNode(true)));
+    pip.document.body.dataset.mode=mode;
+    pip.document.body.classList.add('mini');
+    pip.document.body.appendChild($('app'));
+    pip.document.addEventListener('keydown',keys_);
+    pip.addEventListener('pagehide',()=>{
+      document.body.appendChild($('app'));
+      document.body.insertBefore($('app'),$('toast'));
+      pip=null;render();
+    });
+    render();
+  }catch(e){toast('Could not open floating window')}
+}
+$('mini').onclick=floatToggle;
+// keep floating window's theme in sync
+const _r=render;
+render=function(){_r();if(pip)pip.document.body.dataset.mode=mode};
+render();
+})();
+</script>
+</body>
+</html>
