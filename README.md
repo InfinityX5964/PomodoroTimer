@@ -8,3 +8,5 @@ A simple, minimal Pomodoro timer designed to help you stay focused and take brea
 3. npm install
 4. npm run start   (optional: test it)
 5. npm run dist    (builds dist\Focus.exe, a single portable file)
+
+<img width="400" height="700" alt="image" src="https://github.com/user-attachments/assets/414a0d30-1223-496e-ba74-58f26e6b8630" />
